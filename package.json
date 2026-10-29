@@ -1,0 +1,13 @@
+{
+  "name": "server-pinger-panel",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "echo \"No lint configured\"",
+    "deploy:worker": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "^3.100.0"
+  }
+}

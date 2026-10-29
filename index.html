@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Server Pinger Panel</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --panel-2: #1f2937;
+        --border: #334155;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --primary: #3b82f6;
+        --danger: #ef4444;
+        --success: #22c55e;
+        --warning: #f59e0b;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 30px 20px 60px;
+      }
+
+      h1 {
+        margin-bottom: 20px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 22px;
+        margin-bottom: 22px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.18);
+      }
+
+      .card h2 {
+        margin-top: 0;
+        margin-bottom: 18px;
+      }
+
+      form {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+
+      input, select, button {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: #0b1220;
+        color: var(--text);
+        padding: 12px 14px;
+        font-size: 14px;
+      }
+
+      button {
+        cursor: pointer;
+        border: none;
+        background: var(--primary);
+        font-weight: 700;
+      }
+
+      button.secondary {
+        background: #374151;
+      }
+
+      button.delete {
+        background: var(--danger);
+      }
+
+      .actions {
+        display: flex;
+        align-items: end;
+        gap: 10px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+
+      th, td {
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: bold;
+      }
+
+      .badge.active {
+        background: rgba(34, 197, 94, 0.15);
+        color: var(--success);
+      }
+
+      .badge.inactive {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
+      }
+
+      .table-actions {
+        display: flex;
+        gap: 8px;
+      }
+
+      .table-actions button {
+        padding: 8px 12px;
+        font-size: 12px;
+      }
+
+      @media (max-width: 640px) {
+        .container {
+          padding-left: 12px;
+          padding-right: 12px;
+        }
+        th, td {
+          font-size: 12px;
+          padding: 10px 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Server Pinger Panel</h1>
+
+      <div class="card">
+        <h2 id="formTitle">Add Pinger</h2>
+        <form id="pingerForm">
+          <input type="hidden" id="id" />
+
+          <div>
+            <label for="name">Name</label>
+            <input id="name" type="text" placeholder="My API" required />
+          </div>
+
+          <div>
+            <label for="url">URL</label>
+            <input id="url" type="url" placeholder="https://example.com/health" required />
+          </div>
+
+          <div>
+            <label for="interval">Interval</label>
+            <select id="interval">
+              <option value="1">1 minute</option>
+              <option value="5">5 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="active">Status</label>
+            <select id="active">
+              <option value="true">Active</option>
+              <option value="false">Inactive</option>
+            </select>
+          </div>
+
+          <div class="actions">
+            <button type="submit" id="submitBtn">Save</button>
+            <button type="button" class="secondary" id="cancelBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Pingers</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>URL</th>
+              <th>Interval</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      const WORKER_URL = "https://your-worker-domain.workers.dev";
+      const API_BASE = `${WORKER_URL}/api`;
+
+      const form = document.getElementById("pingerForm");
+      const tableBody = document.getElementById("tableBody");
+      const formTitle = document.getElementById("formTitle");
+      const submitBtn = document.getElementById("submitBtn");
+
+      async function fetchData(url, options = {}) {
+        const res = await fetch(url, {
+          headers: { "Content-Type": "application/json" },
+          ...options
+        });
+
+        if (!res.ok) {
+          throw new Error(`Request failed: ${res.status}`);
+        }
+
+        return res.status === 204 ? null : res.json();
+      }
+
+      async function loadPingers() {
+        try {
+          const items = await fetchData(`${API_BASE}/pingers`);
+          renderTable(items || []);
+        } catch (error) {
+          console.error(error);
+          tableBody.innerHTML = `
+            <tr>
+              <td colspan="5">Unable to load pingers. Set your Worker URL in the script.</td>
+            </tr>
+          `;
+        }
+      }
+
+      function renderTable(items) {
+        if (!items.length) {
+          tableBody.innerHTML = `
+            <tr>
+              <td colspan="5">No pingers yet.</td>
+            </tr>
+          `;
+          return;
+        }
+
+        tableBody.innerHTML = items.map((item) => `
+          <tr>
+            <td>${item.name}</td>
+            <td>${item.url}</td>
+            <td>${item.interval} min</td>
+            <td><span class="badge ${item.active ? "active" : "inactive"}">${item.active ? "Active" : "Inactive"}</span></td>
+            <td>
+              <div class="table-actions">
+                <button type="button" data-edit="${item.id}">Edit</button>
+                <button type="button" class="delete" data-delete="${item.id}">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `).join("");
+
+        document.querySelectorAll("[data-edit]").forEach((btn) => {
+          btn.addEventListener("click", () => editPinger(btn.dataset.edit));
+        });
+
+        document.querySelectorAll("[data-delete]").forEach((btn) => {
+          btn.addEventListener("click", () => deletePinger(btn.dataset.delete));
+        });
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const payload = {
+          id: document.getElementById("id").value || undefined,
+          name: document.getElementById("name").value,
+          url: document.getElementById("url").value,
+          interval: Number(document.getElementById("interval").value),
+          active: document.getElementById("active").value === "true"
+        };
+
+        try {
+          const id = payload.id;
+          const endpoint = id ? `${API_BASE}/pingers/${id}` : `${API_BASE}/pingers`;
+          const method = id ? "PUT" : "POST";
+
+          await fetchData(endpoint, {
+            method,
+            body: JSON.stringify(payload)
+          });
+
+          resetForm();
+          await loadPingers();
+        } catch (error) {
+          alert("Failed to save pinger");
+          console.error(error);
+        }
+      });
+
+      async function editPinger(id) {
+        try {
+          const item = await fetchData(`${API_BASE}/pingers/${id}`);
+          document.getElementById("id").value = item.id;
+          document.getElementById("name").value = item.name;
+          document.getElementById("url").value = item.url;
+          document.getElementById("interval").value = String(item.interval);
+          document.getElementById("active").value = String(item.active);
+
+          formTitle.textContent = "Edit Pinger";
+          submitBtn.textContent = "Update";
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (error) {
+          console.error(error);
+          alert("Unable to load pinger for editing");
+        }
+      }
+
+      async function deletePinger(id) {
+        if (!confirm("Delete this pinger?")) return;
+
+        try {
+          await fetchData(`${API_BASE}/pingers/${id}`, { method: "DELETE" });
+          await loadPingers();
+        } catch (error) {
+          console.error(error);
+          alert("Failed to delete pinger");
+        }
+      }
+
+      function resetForm() {
+        form.reset();
+        document.getElementById("id").value = "";
+        document.getElementById("active").value = "true";
+        document.getElementById("interval").value = "1";
+        formTitle.textContent = "Add Pinger";
+        submitBtn.textContent = "Save";
+      }
+
+      document.getElementById("cancelBtn").addEventListener("click", resetForm);
+      resetForm();
+      loadPingers();
+    </script>
+  </body>
+</html>

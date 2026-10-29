@@ -1,0 +1,15 @@
+name = "server-pinger-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[triggers]]
+crons = ["*/1 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pinger-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+[vars]
+API_BASE = "https://your-worker-domain.workers.dev"
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/REPLACE/THIS"
